@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hajj Fund Anomaly Detection</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   Geometry, colours and type below are read directly out of
+   Hajj_fund_anomaly_detection.pptx (800 x 800 px canvas, 96dpi).
+   Point sizes from the file are converted to px at 4/3.
+   ============================================================ */
+:root{
+  --s: 1;                      /* type scale: 1 on desktop = identical to slide */
+  --bg:        #F7F9FD;        /* slide background image (flat light blue) */
+  --topbar:    #162F47;
+  --navy:      #103C81;        /* title + file name */
+  --btn-navy:  #1C3248;        /* Run detection button */
+  --ink:       #000000;
+  --red:       #E14F4F;        /* "Suspicious" */
+  --icon-red:  #FF0000;        /* warning triangle icon */
+  --icon-navy: #0A3255;        /* download icon */
+  --card:      #FEFEFF;        /* upload card / sample button */
+  --panel:     #FDFDFE;        /* stat cards + table card */
+  --thead:     #F1F8FE;        /* table header band */
+  --rule:      #E9F1FB;        /* row separators */
+  --dash:      rgba(26,45,64,.40);
+  --badge-inv: #ECEDFF;
+  --badge-dep: #CEF6E3;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg)}
+body{
+  font-family:'Open Sans','Segoe UI',system-ui,sans-serif;
+  color:var(--ink);
+  -webkit-font-smoothing:antialiased;
+  padding-bottom:55.9px;
+}
+
+/* ---------- top bar ---------- */
+.topbar{height:30.5px;background:var(--topbar);display:flex;align-items:center;padding-left:21.6px}
+.topbar span{
+  font-size:calc(10.7px * var(--s));font-weight:800;color:#FFF;letter-spacing:.53px;line-height:1;
+}
+
+/* ---------- page ---------- */
+.page{width:800px;margin:0 auto;padding:0 12px}
+
+.title{
+  margin-top:43px;text-align:center;white-space:nowrap;
+  font-size:calc(29.6px * var(--s));font-weight:700;color:var(--navy);line-height:41.5px;
+}
+.subtitle{
+  margin-top:8px;text-align:center;
+  font-size:calc(11.8px * var(--s));font-weight:500;color:var(--ink);line-height:18.8px;
+}
+
+/* ---------- upload card ---------- */
+.upload-card{
+  width:704.5px;max-width:100%;margin:31.2px auto 0;
+  background:var(--card);border-radius:8px;
+  box-shadow:0 2px 8px rgba(16,60,129,.07);
+  padding:12.9px 13.6px 8.4px;
+}
+.dropzone{
+  height:125.7px;border:1.5px dashed var(--dash);border-radius:10px;
+  display:flex;align-items:center;justify-content:center;text-align:center;
+  cursor:pointer;padding:0 16px;
+}
+.dropzone.over{background:rgba(16,60,129,.035)}
+#dropText{font-size:calc(9.6px * var(--s));font-weight:700;color:var(--navy);line-height:13.5px;word-break:break-all}
+#dropText.err{color:var(--red)}
+
+.btn-run{
+  width:100%;height:34.5px;margin-top:14px;border:0;border-radius:8px;
+  background:var(--btn-navy);color:#FFF;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  box-shadow:0 2px 6px rgba(28,50,72,.20);
+  font-family:inherit;font-size:calc(9.4px * var(--s));font-weight:700;line-height:1;
+}
+.btn-run:disabled{opacity:.55;cursor:default}
+
+.sample-row{display:flex;justify-content:flex-end;margin-top:15.2px}
+.btn-sample{
+  height:26.7px;border:0;border-radius:10px;background:var(--card);cursor:pointer;
+  box-shadow:0 2px 6px rgba(16,60,129,.10);
+  display:flex;align-items:center;gap:8.4px;padding:0 14.1px;
+  font-family:inherit;font-size:calc(8.3px * var(--s));font-weight:600;color:var(--ink);
+  line-height:1;white-space:nowrap;
+}
+
+/* ---------- results ---------- */
+#results{display:none}
+#results.show{display:block}
+
+.stats{width:656.6px;max-width:100%;margin:21.1px auto 0;display:flex;gap:13px}
+.stat{
+  flex:1;height:77.9px;background:var(--panel);border-radius:10px;
+  box-shadow:0 2px 8px rgba(16,60,129,.07);padding:16.3px 19.2px 0;
+}
+.stat .lbl{font-size:calc(11.1px * var(--s));font-weight:500;line-height:13.3px}
+.stat .val{margin-top:3.1px;font-size:calc(24.7px * var(--s));font-weight:700;line-height:29.7px}
+
+.table-card{
+  width:656.6px;max-width:100%;margin:12.4px auto 0;height:222.3px;
+  background:var(--panel);border-radius:10px;
+  box-shadow:0 2px 8px rgba(16,60,129,.07);overflow:hidden;
+}
+.tscroll{height:100%;overflow:auto}
+.tgrid{min-width:656.6px}
+.trow{display:flex;padding:0 21.1px;align-items:center}
+.thead{height:28px;background:var(--thead);font-weight:500;position:sticky;top:0;z-index:1;border-bottom:1px solid var(--rule)}
+.tbody .trow{min-height:51.4px;border-top:1px solid var(--rule)}
+.tbody .trow:first-child{border-top:0}
+.c1{width:114.4px;flex:0 0 114.4px}
+.c2{width:133.7px;flex:0 0 133.7px}
+.c3{width:180.2px;flex:0 0 180.2px}
+.c4{flex:1 1 auto;min-width:186px}
+.thead .c1{font-size:calc(11.1px * var(--s))}
+.thead .c2{font-size:calc(10.4px * var(--s))}
+.thead .c3{font-size:calc(9.7px  * var(--s))}
+.thead .c4{font-size:calc(10.1px * var(--s))}
+.tbody .c1{font-size:calc(11.1px * var(--s));font-weight:500}
+.tbody .c3{font-size:calc(10.4px * var(--s));font-weight:500}
+.badge{
+  display:inline-block;border-radius:999px;padding:0 calc(7.5px * var(--s));
+  height:calc(17px * var(--s));line-height:calc(17px * var(--s));
+  font-size:calc(10.1px * var(--s));font-weight:500;background:var(--badge-inv);
+}
+.badge.dep{background:var(--badge-dep)}
+.flagline{display:flex;align-items:center;margin-left:-3.2px}
+.flagline svg{flex:0 0 16.6px;width:16.6px;height:15.2px;margin-right:7.7px}
+.flagline b{font-size:calc(10.4px * var(--s));font-weight:700;color:var(--red);line-height:12.5px}
+.reason{margin-top:6px;font-size:calc(10.1px * var(--s));font-weight:400;line-height:11.8px}
+.tempty{padding:18px 21.1px;font-size:calc(10.1px * var(--s));font-weight:400}
+
+/* ---------- small screens ---------- */
+@media (max-width:839px){
+  :root{--s:1.3}
+  .page{width:100%;padding:0 14px}
+  .title{white-space:normal;line-height:1.2;margin-top:28px}
+  .subtitle{line-height:1.35}
+  .upload-card,.stats,.table-card{width:100%}
+  .stats{flex-direction:column;gap:12px}
+  .stat{height:auto;padding-bottom:16px}
+  .stat .lbl,.stat .val,.tbody .c1,.tbody .c3,.flagline b,.reason,#dropText{line-height:1.3}
+  .tbody .trow{min-height:0;padding-top:12px;padding-bottom:12px}
+  .table-card{height:auto;max-height:70vh}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar"><span>RISK &amp; AUDIT RESEARCH</span></div>
+
+<div class="page">
+
+  <h1 class="title">HAJJ FUND ANOMALY DETECTION</h1>
+  <p class="subtitle">Upload a transaction CSV to screen for anomalies</p>
+
+  <div class="upload-card">
+    <div class="dropzone" id="dropzone">
+      <div id="dropText">Drop CSV here or click to browse</div>
+    </div>
+    <input type="file" id="fileInput" accept=".csv,text/csv" hidden>
+
+    <button class="btn-run" id="runBtn" disabled>
+      <svg width="10.2" height="11" viewBox="0 0 10.2 11" aria-hidden="true"><path d="M0 0 L10.2 5.5 L0 11 Z" fill="#FFFFFF"/></svg>
+      Run detection
+    </button>
+
+    <div class="sample-row">
+      <button class="btn-sample" id="sampleBtn">
+        <svg width="13.5" height="13.5" viewBox="140 70 420 420" aria-hidden="true"><g fill="#0A3255" clip-rule="evenodd" fill-rule="evenodd"><path d="M368.5,330.6V88.5c0-4.9-1.9-9.6-5.4-13.1C359.6,72,354.9,70,350,70s-9.6,2-13.1,5.4c-3.5,3.5-5.4,8.2-5.4,13.1v242.1c0,0-35.3-35.3-55-55c-3.5-3.5-8.2-5.4-13.1-5.4c-4.9,0-9.6,1.9-13.1,5.4c-7.2,7.2-7.2,18.9,0,26.1l87.3,87.3c3.3,3.3,7.7,5.1,12.4,5.1s9.1-1.8,12.4-5.1l87.3-87.3c7.2-7.2,7.2-18.9,0-26.1c-3.5-3.5-8.2-5.4-13.1-5.4c-4.9,0-9.6,1.9-13.1,5.4C403.7,295.3,368.5,330.6,368.5,330.6L368.5,330.6z"/><path d="M140,455c0,9.3,3.7,18.2,10.3,24.7c6.6,6.6,15.5,10.3,24.7,10.3h350c9.3,0,18.2-3.7,24.7-10.3c6.6-6.6,10.3-15.5,10.3-24.7V349.1c0-10.2-8.3-18.5-18.5-18.5h0c-4.9,0-9.6,2-13.1,5.4c-3.5,3.5-5.4,8.2-5.4,13.1v86.5c0,9.7-7.8,17.5-17.5,17.5H194.5c-9.7,0-17.5-7.8-17.5-17.5v-86.5c0-4.9-2-9.6-5.4-13.1c-3.5-3.5-8.2-5.4-13.1-5.4h0c-10.2,0-18.5,8.3-18.5,18.5L140,455L140,455z"/></g></svg>
+        Download sample_CSV
+      </button>
+    </div>
+  </div>
+
+  <div id="results">
+    <div class="stats">
+      <div class="stat">
+        <div class="lbl">Total transactions</div>
+        <div class="val" id="statTotal">0</div>
+      </div>
+      <div class="stat">
+        <div class="lbl">Flagged anomalies</div>
+        <div class="val" id="statFlagged">0</div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="tscroll">
+        <div class="tgrid">
+          <div class="trow thead">
+            <div class="c1">ID</div>
+            <div class="c2">TYPE</div>
+            <div class="c3">AMOUNT</div>
+            <div class="c4">WHY FLAGGED</div>
+          </div>
+          <div class="tbody" id="tbody"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.0/dist/ort.min.js"></script>
+<script>
+'use strict';
+
+/* ============================================================
+   Model parameters exported from the trained scikit-learn
+   Isolation Forest (model.pkl -> model.onnx). These values
+   (scaler mean/scale, per-category amount statistics, feature
+   order) must stay in sync with train_model.py.
+   ============================================================ */
+const MODEL_PARAMS = {"scalerMean": [627607307.4, 11.989366666666667, 3.0053666666666667, 6.004133333333334, 0.004, 4007.942902222222, -3.315866100213801e-16, 0.010033333333333333, 0.012266666666666667, 0.4492333333333333, 0.151, 0.11253333333333333, 0.15796666666666667, 0.1616, 0.2418, 0.1751, 0.11396666666666666, 0.5645, 0.06076666666666666, 0.22373333333333334], "scalerScale": [1586184145.7792294, 2.6353343112823886, 1.9955795813636588, 2.9351745403335427, 0.063118935352238, 4906.5049450687175, 0.9998833265269838, 0.19061129440711416, 0.22252234844068033, 0.4974160688553954, 0.3580488793447062, 0.31602149012720987, 0.36470974608431966, 0.368083468794783, 0.4281737497792222, 0.38005261477853297, 0.31777077517537006, 0.49582229679593876, 0.23890181851314757, 0.41674540056116854], "featureColumns": ["amount_idr", "hour", "day_of_week", "month", "is_round_number", "prev_tx_gap_min", "amount_zscore_in_category", "tx_count_last_1h", "tx_count_last_24h", "transaction_type_disbursement", "transaction_type_investment", "sub_category_living_cost", "sub_category_pelunasan", "sub_category_rekening_virtual", "sub_category_setoran_awal", "sub_category_subsidi_biaya_haji", "sub_category_sukuk_sbsn", "channel_bank_transfer", "channel_teller", "channel_virtual_account"]};
+
+let onnxSession = null;
+
+async function loadModel(){
+  onnxSession = await ort.InferenceSession.create('model.onnx');
+}
+loadModel().catch(()=>{ setDrop('Failed to load the detection model.', true); });
+
+const dropzone=document.getElementById('dropzone'),
+      dropText=document.getElementById('dropText'),
+      fileInput=document.getElementById('fileInput'),
+      runBtn=document.getElementById('runBtn'),
+      results=document.getElementById('results'),
+      tbody=document.getElementById('tbody');
+
+let selectedFile=null;
+
+function setDrop(msg,isErr){ dropText.textContent=msg; dropText.classList.toggle('err',!!isErr); }
+
+function acceptFile(file){
+  if(!file)return;
+  if(!/\.csv$/i.test(file.name)&&file.type!=='text/csv'){ setDrop('Drop CSV here or click to browse',true); return; }
+  selectedFile=file;
+  setDrop(file.name,false);
+  runBtn.disabled=false;
+  results.classList.remove('show');
+}
+
+dropzone.addEventListener('click',()=>fileInput.click());
+fileInput.addEventListener('change',e=>acceptFile(e.target.files[0]));
+['dragenter','dragover'].forEach(ev=>dropzone.addEventListener(ev,e=>{e.preventDefault();dropzone.classList.add('over');}));
+['dragleave','drop'].forEach(ev=>dropzone.addEventListener(ev,e=>{e.preventDefault();dropzone.classList.remove('over');}));
+dropzone.addEventListener('drop',e=>acceptFile(e.dataTransfer.files[0]));
+
+const fmtRp=v=>'Rp '+new Intl.NumberFormat('id-ID').format(Math.round(v));
+
+/* ---------------- minimal CSV parser (RFC4180-ish, no quoted-comma edge cases needed for our schema) ---------------- */
+function parseCSV(text){
+  return text.replace(/\r/g,'').split('\n').filter(l=>l.length>0).map(line=>{
+    const cells=[]; let cur=''; let inQ=false;
+    for(let i=0;i<line.length;i++){
+      const ch=line[i];
+      if(ch==='"'){ inQ=!inQ; continue; }
+      if(ch===','&&!inQ){ cells.push(cur); cur=''; continue; }
+      cur+=ch;
+    }
+    cells.push(cur);
+    return cells;
+  });
+}
+
+/* ---------------- feature engineering, ported from train_model.py::engineer_features ---------------- */
+function engineerAndPredict(rows){
+  const headers=rows[0].map(h=>h.trim());
+  const col=name=>headers.indexOf(name);
+
+  const iId=col('transaction_id'), iTs=col('timestamp'), iType=col('transaction_type'),
+        iSub=col('sub_category'), iAmt=col('amount_idr'), iOrigin=col('account_origin'),
+        iDest=col('account_destination'), iChannel=col('channel');
+
+  const required=[iId,iTs,iType,iSub,iAmt,iOrigin,iDest,iChannel];
+  if(required.some(i=>i<0)){
+    throw new Error('CSV is missing one or more required columns: transaction_id, timestamp, transaction_type, sub_category, amount_idr, account_origin, account_destination, channel');
+  }
+
+  let recs=rows.slice(1).map(r=>({
+    id:r[iId], ts:new Date(String(r[iTs]).trim().replace(' ','T')),
+    type:r[iType], sub:r[iSub], amount:parseFloat(r[iAmt]),
+    origin:r[iOrigin], dest:r[iDest], channel:r[iChannel]
+  })).filter(r=>isFinite(r.amount) && !isNaN(r.ts.getTime()));
+
+  if(recs.length===0) throw new Error('No usable rows found in the uploaded CSV.');
+
+  // sort by (origin, timestamp) — mirrors df.sort_values(["account_origin","timestamp"])
+  recs.sort((a,b)=> a.origin<b.origin?-1 : a.origin>b.origin?1 : a.ts-b.ts);
+
+  // prev_tx_gap_min per origin account
+  const lastSeen={};
+  recs.forEach(r=>{
+    const prev=lastSeen[r.origin];
+    r.prevGapMin = prev ? Math.min((r.ts-prev)/60000, 10080) : 10080;
+    lastSeen[r.origin]=r.ts;
+  });
+
+  // tx_count_last_1h / 24h per individual (non "BPKH_TREASURY") origin account
+  const byOrigin={};
+  recs.forEach(r=>{ (byOrigin[r.origin]=byOrigin[r.origin]||[]).push(r); });
+  Object.keys(byOrigin).forEach(origin=>{
+    if(origin==='BPKH_TREASURY') return;
+    const group=byOrigin[origin];
+    group.forEach(r=>{
+      const t=r.ts.getTime();
+      r.count1h  = group.filter(g=> g.ts.getTime()<=t && g.ts.getTime()>=t-3600000).length - 1;
+      r.count24h = group.filter(g=> g.ts.getTime()<=t && g.ts.getTime()>=t-86400000).length - 1;
+    });
+  });
+  recs.forEach(r=>{ if(r.count1h===undefined){ r.count1h=0; r.count24h=0; } });
+
+  // amount z-score within sub_category, computed from the UPLOADED file itself
+  // (mirrors app.py: engineer_features() recomputes this per-batch, not from a fixed training reference)
+  const catGroups={};
+  recs.forEach(r=>{ (catGroups[r.sub]=catGroups[r.sub]||[]).push(r.amount); });
+  const catStats={};
+  Object.keys(catGroups).forEach(sub=>{
+    const vals=catGroups[sub];
+    const mean=vals.reduce((a,b)=>a+b,0)/vals.length;
+    // sample standard deviation (ddof=1), matches pandas .std() default
+    const std=Math.sqrt(vals.length>1 ? vals.reduce((a,b)=>a+(b-mean)*(b-mean),0)/(vals.length-1) : 0);
+    catStats[sub]={mean, std};
+  });
+  recs.forEach(r=>{
+    const stats=catStats[r.sub];
+    r.amountZ = stats && stats.std>0 ? (r.amount - stats.mean)/stats.std : 0;
+  });
+
+  const catTypes=['disbursement','investment']; // deposit is the drop_first baseline
+  const catSubs=['living_cost','pelunasan','rekening_virtual','setoran_awal','subsidi_biaya_haji','sukuk_sbsn']; // deposito_syariah is baseline
+  const catChannels=['bank_transfer','teller','virtual_account']; // RTGS is baseline
+
+  const cols=MODEL_PARAMS.featureColumns;
+  const X=recs.map(r=>{
+    const isRound = (r.amount % 1_000_000_000 === 0) ? 1 : 0;
+    const base={
+      amount_idr:r.amount, hour:r.ts.getHours(), day_of_week:(r.ts.getDay()+6)%7, // JS Sunday=0 -> Python Monday=0
+      month:r.ts.getMonth()+1, is_round_number:isRound, prev_tx_gap_min:r.prevGapMin,
+      amount_zscore_in_category:r.amountZ, tx_count_last_1h:r.count1h, tx_count_last_24h:r.count24h,
+      transaction_type_disbursement:r.type==='disbursement'?1:0,
+      transaction_type_investment:r.type==='investment'?1:0,
+      sub_category_living_cost:r.sub==='living_cost'?1:0,
+      sub_category_pelunasan:r.sub==='pelunasan'?1:0,
+      sub_category_rekening_virtual:r.sub==='rekening_virtual'?1:0,
+      sub_category_setoran_awal:r.sub==='setoran_awal'?1:0,
+      sub_category_subsidi_biaya_haji:r.sub==='subsidi_biaya_haji'?1:0,
+      sub_category_sukuk_sbsn:r.sub==='sukuk_sbsn'?1:0,
+      channel_bank_transfer:r.channel==='bank_transfer'?1:0,
+      channel_teller:r.channel==='teller'?1:0,
+      channel_virtual_account:r.channel==='virtual_account'?1:0,
+    };
+    return cols.map((c,i)=> (base[c]-MODEL_PARAMS.scalerMean[i]) / MODEL_PARAMS.scalerScale[i]);
+  });
+
+  return {recs, X};
+}
+
+function explainReason(r){
+  if(Math.abs(r.amountZ) > 2) return 'Unusually large amount for this transaction type';
+  if((r.amount % 1_000_000_000)===0) return 'Suspiciously round amount';
+  if(r.count1h >= 3) return 'Multiple transactions from the same account within 1 hour';
+  if(r.type==='disbursement' && r.prevGapMin >= 10080) return 'First disbursement seen to this destination account';
+  const h=r.ts.getHours();
+  if(h<6 || h>=22) return 'Occurred at an unusual hour';
+  return 'Unusual combination of transaction attributes';
+}
+
+/* ---------------- run ---------------- */
+runBtn.addEventListener('click', async ()=>{
+  if(!selectedFile || !onnxSession) return;
+
+  runBtn.disabled=true;
+  setDrop('Processing...', false);
+  results.classList.remove('show');
+
+  try{
+    const text=await selectedFile.text();
+    const rows=parseCSV(text);
+    if(rows.length<2) throw new Error('The uploaded CSV has no data rows.');
+
+    const {recs, X}=engineerAndPredict(rows);
+
+    const flatX=Float32Array.from(X.flat());
+    const tensor=new ort.Tensor('float32', flatX, [X.length, X[0].length]);
+    const output=await onnxSession.run({ input: tensor });
+    const labels=output.label.data;   // -1 = anomaly, 1 = normal
+    const scores=output.scores.data;  // higher = more anomalous (already inverted by skl2onnx)
+
+    recs.forEach((r,i)=>{ r.flagged = labels[i]===-1n || labels[i]===-1; r.score=scores[i]; });
+
+    const flagged=recs.filter(r=>r.flagged).sort((a,b)=>b.score-a.score);
+
+    document.getElementById('statTotal').textContent = new Intl.NumberFormat('id-ID').format(recs.length);
+    const pct=(flagged.length/recs.length*100).toFixed(1);
+    document.getElementById('statFlagged').textContent = flagged.length+' ('+pct+'%)';
+
+    tbody.innerHTML='';
+    if(flagged.length===0){
+      const empty=document.createElement('div');
+      empty.className='tempty';
+      empty.textContent='No anomalies flagged in this file.';
+      tbody.appendChild(empty);
+    }else{
+      flagged.forEach(r=>{
+        const dep=/deposit/i.test(r.type);
+        const row=document.createElement('div');
+        row.className='trow';
+        row.innerHTML=
+          '<div class="c1"></div>'+
+          '<div class="c2"><span class="badge'+(dep?' dep':'')+'"></span></div>'+
+          '<div class="c3"></div>'+
+          '<div class="c4">'+
+            '<div class="flagline">'+
+              '<svg viewBox="0 0 24 22" aria-hidden="true"><g fill="#FF0000">'+
+              '<path d="M14.184,1.282C13.731,0.491,12.895,0,12,0s-1.731,0.491-2.196,1.306L0.41,18.123l-0.098,0.166C0.108,18.658,0,19.077,0,19.5C0,20.879,1.121,22,2.5,22h19c1.379,0,2.5-1.121,2.5-2.5c0-0.423-0.108-0.842-0.32-1.227L14.184,1.282z M21.5,21h-19C1.673,21,1,20.327,1,19.5c0-0.258,0.063-0.503,0.18-0.713l9.504-17.009C10.959,1.299,11.463,1,12,1s1.041,0.299,1.323,0.794l9.407,16.843l0.082,0.135C22.937,18.997,23,19.242,23,19.5C23,20.327,22.327,21,21.5,21z"/>'+
+              '<circle r="1" cx="12" cy="18"/>'+
+              '<path d="M12,6c-0.55,0-1,0.45-1,1c0,0.021,0.011,0.039,0.012,0.06H11l0.5,8.44v0.03C11.52,15.8,11.73,16,12,16s0.48-0.2,0.5-0.47V15.5L13,7.06h-0.012C12.989,7.039,13,7.021,13,7C13,6.45,12.55,6,12,6z"/>'+
+              '</g></svg><b>Suspicious</b>'+
+            '</div>'+
+            '<div class="reason"></div>'+
+          '</div>';
+        row.querySelector('.c1').textContent=r.id;
+        row.querySelector('.badge').textContent=r.type;
+        row.querySelector('.c3').textContent=fmtRp(r.amount);
+        row.querySelector('.reason').textContent=explainReason(r);
+        tbody.appendChild(row);
+      });
+    }
+
+    setDrop(selectedFile.name, false);
+    results.classList.add('show');
+  }catch(err){
+    setDrop(err.message || 'Something went wrong while processing the file.', true);
+  }finally{
+    runBtn.disabled=false;
+  }
+});
+
+/* ---------------- sample CSV: points to the file placed alongside this page in the repo ---------------- */
+document.getElementById('sampleBtn').addEventListener('click',()=>{
+  window.location.href='sample_data.csv';
+});
+</script>
+</body>
+</html>
